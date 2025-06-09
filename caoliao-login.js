@@ -25,19 +25,23 @@ require('dotenv').config();
   try {
     console.log('[1/6] 打开草料二维码用户登录页...');
     await page.goto('https://user.cli.im/login');
+    await page.waitForTimeout(3000);
 
     console.log('[2/6] 等待手机号密码输入框...');
     await page.waitForSelector('input[placeholder="请输入手机号"]', { timeout: 10000 });
+    await page.waitForTimeout(3000);
 
     console.log('[3/6] 输入账号密码...');
     await page.fill('input[placeholder="请输入手机号"]', process.env.CAOLIAO_USERNAME);
     await page.fill('input[placeholder="请输入密码"]', process.env.CAOLIAO_PASSWORD);
+    await page.waitForTimeout(3000);
 
     console.log('[4/6] 点击登录按钮...');
     await page.click('xpath=//*[@id="login-btn"]');
+    await page.waitForTimeout(3000);
 
     console.log('[5/6] 等待后台跳转...');
-    await page.waitForURL(url => url.includes('/center'), { timeout: 15000 });
+    await page.waitForURL((url) => typeof url === 'string' && url.includes('/center'), { timeout: 15000 });
     console.log('✅ 登录成功，已进入后台页面！');
 
     // ✅ 检查是否有弹窗提醒...
