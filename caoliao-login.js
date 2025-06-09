@@ -61,6 +61,7 @@ const webhookUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=bc1fd31
           console.log('✅ 已点击弹窗右上角 ×');
         } catch {
           const warnPath = path.join(screenshotDir, 'popup-unhandled.png');
+          await page.waitForTimeout(3000);
           await page.screenshot({ path: warnPath });
           console.log('⚠️ 弹窗存在但未成功关闭，已截图：', warnPath);
         }
@@ -77,6 +78,7 @@ const webhookUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=bc1fd31
       console.log('✅ 已点击“全部记录”链接');
     } catch (e) {
       const errPath = path.join(screenshotDir, 'click-full-error.png');
+      await page.waitForTimeout(3000);
       await page.screenshot({ path: errPath });
       console.error('❌ 点击“全部记录”失败，截图保存在：', errPath);
     }
@@ -85,6 +87,7 @@ const webhookUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=bc1fd31
     console.error('当前页面地址：', page.url());
     const errPath = path.join(screenshotDir, 'login-error.png');
     try {
+      await page.waitForTimeout(3000);
       await page.screenshot({ path: errPath, timeout: 5000 });
       console.error(`❌ 登录失败，错误截图保存在：${errPath}`);
 
