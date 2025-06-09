@@ -1,11 +1,13 @@
 {
-  "name": "autoweb",
+  "name": "caoliao-auto",
   "version": "1.0.0",
-  "main": "submit-ticket.js",
+  "description": "自动化登录草料二维码并下载数据",
+  "main": "caoliao-login.js",
   "scripts": {
-    "start": "node submit-ticket.js"
+    "start": "node caoliao-login.js"
   },
   "dependencies": {
-    "playwright": "^1.52.0"
+    "playwright": "^1.43.1",
+    "dotenv": "^16.3.1"
   }
 }
