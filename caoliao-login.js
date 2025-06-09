@@ -91,7 +91,7 @@ const webhookUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=bc1fd31
 
     console.log('[7/7] 点击“交接班登记”卡片的“全部记录”链接...');
     try {
-      const fullLink = await page.waitForSelector('xpath=//*[@id="recentUpdateBlock"]//span[contains(text(),"全部")]', { timeout: 5000 });
+      const fullLink = await page.waitForSelector('xpath=//*[@id="recentUpdateBlock"]//span[contains(text(),"全部") and contains(text(),"条")]', { timeout: 5000 });
       await fullLink.click();
       console.log('✅ 已点击“全部记录”链接');
     } catch (e) {
