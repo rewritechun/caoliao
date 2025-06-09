@@ -14,7 +14,6 @@ const webhookUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=bc1fd31
 
   const page = await browser.newPage();
 
-  // 构建截图存储路径
   const today = new Date();
   const yyyy = today.getFullYear();
   const mm = String(today.getMonth() + 1).padStart(2, '0');
@@ -41,26 +40,35 @@ const webhookUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=bc1fd31
 
     console.log('[4/6] 点击登录按钮...');
     await page.click('xpath=//*[@id="login-btn"]');
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(5000);
 
     console.log('[5/6] 等待后台跳转...');
     await page.waitForURL((url) => typeof url === 'string' && url.includes('/center'), { timeout: 15000 });
     console.log('✅ 登录成功，已进入后台页面！');
 
-    // ✅ 检查是否有弹窗提醒...
+    // ✅ 处理“多设备登录提醒”弹窗
     console.log('[6/6] 检查是否有弹窗提醒...');
     try {
-      const iKnowBtn = await page.waitForSelector('//button[contains(text(),"我知道了")]', { timeout: 3000 });
-      await iKnowBtn.click({ force: true });
-      console.log('✅ 已点击“我知道了”关闭多设备提醒');
-    } catch {
-      try {
-        const closeBtn = await page.waitForSelector('//div[contains(@class,"modal")]//i[contains(@class,"close")]', { timeout: 3000 });
-        await closeBtn.click({ force: true });
-        console.log('✅ 已点击右上角 × 关闭多设备提醒');
-      } catch {
-        console.log('⚠️ 未检测到“多设备登录提醒”弹窗，继续执行');
+      const dialog = await page.waitForSelector('.el-dialog', { timeout: 5000 });
+      if (dialog) {
+        try {
+          const iKnowBtn = await dialog.$('//button[contains(text(),"我知道了")]');
+          if (iKnowBtn) {
+            await iKnowBtn.click({ force: true });
+            console.log('✅ 已点击“我知道了”关闭弹窗');
+          } else {
+            const closeIcon = await dialog.$('button.el-dialog__headerbtn');
+            if (closeIcon) {
+              await closeIcon.click({ force: true });
+              console.log('✅ 已点击弹窗右上角 ×');
+            }
+          }
+        } catch (e) {
+          console.log('⚠️ 弹窗存在但点击失败');
+        }
       }
+    } catch {
+      console.log('✅ 未检测到“多设备登录提醒”弹窗，继续执行');
     }
 
   } catch (err) {
