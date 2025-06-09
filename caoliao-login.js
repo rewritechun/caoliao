@@ -49,12 +49,12 @@ const webhookUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=bc1fd31
     // ✅ 处理“多设备登录提醒”弹窗
     console.log('[6/6] 检查是否有弹窗提醒...');
     try {
-      const iKnowBtn = await page.waitForSelector('xpath=/html/body/div[19]/div/div[2]/div/div[2]/div/div[4]/a[2]', { timeout: 3000 });
+      const iKnowBtn = await page.waitForSelector('//a[contains(text(),"我知道了")]', { timeout: 3000 });
       await iKnowBtn.click({ force: true });
       console.log('✅ 已点击“我知道了”关闭弹窗');
     } catch {
       try {
-        const closeIcon = await page.waitForSelector('xpath=/html/body/div[19]/div/div[2]/div/div[2]/div/button/span/i/svg', { timeout: 3000 });
+        const closeIcon = await page.waitForSelector('//div[contains(@class,"dialog")]//button[contains(@class,"el-dialog__headerbtn")]', { timeout: 3000 });
         await closeIcon.click({ force: true });
         console.log('✅ 已点击弹窗右上角 ×');
       } catch {
