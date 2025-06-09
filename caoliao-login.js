@@ -11,7 +11,7 @@ require('dotenv').config();
 
   const page = await browser.newPage();
 
-  // 获取当前日期用于截图目录
+  // 构建日期文件夹路径
   const today = new Date();
   const yyyy = today.getFullYear();
   const mm = String(today.getMonth() + 1).padStart(2, '0');
@@ -24,28 +24,28 @@ require('dotenv').config();
   }
 
   try {
-    console.log('[1/4] 打开草料用户登录页...');
+    console.log('[1/5] 打开草料二维码登录首页...');
     await page.goto('https://user.cli.im/login');
 
-    console.log('[2/4] 等待手机号输入框加载...');
+    console.log('[2/5] 等待登录表单加载...');
     await page.waitForSelector('input[placeholder="请输入手机号"]', { timeout: 10000 });
 
-    console.log('[3/4] 输入手机号与密码...');
+    console.log('[3/5] 输入账号和密码...');
     await page.fill('input[placeholder="请输入手机号"]', process.env.CAOLIAO_USERNAME);
     await page.fill('input[placeholder="请输入密码"]', process.env.CAOLIAO_PASSWORD);
 
-    console.log('[4/4] 点击登录按钮...');
-    await page.click('button:has-text("登录")');
+    console.log('[4/5] 点击登录按钮...');
+    await page.click('xpath=//*[@id="login-btn"]');
 
-    console.log('⏳ 等待跳转到后台首页...');
+    console.log('[5/5] 等待跳转至后台页面...');
     await page.waitForURL('**/dashboard', { timeout: 15000 });
 
-    console.log('✅ 登录成功，已进入后台页面。');
+    console.log('✅ 登录成功，已进入草料后台！');
 
   } catch (err) {
-    const errPath = path.join(screenshotDir, 'login-error.png');
-    await page.screenshot({ path: errPath });
-    console.error(`❌ 登录失败，错误截图保存在：${errPath}`);
+    const errorPath = path.join(screenshotDir, 'login-error.png');
+    await page.screenshot({ path: errorPath });
+    console.error(`❌ 登录失败，错误截图保存至：${errorPath}`);
     console.error(err);
   } finally {
     await browser.close();
