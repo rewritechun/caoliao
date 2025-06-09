@@ -4,51 +4,49 @@ const path = require('path');
 require('dotenv').config();
 
 (async () => {
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({
+    headless: true,
+    args: ['--no-sandbox']
+  });
+
   const page = await browser.newPage();
 
-  // 获取今天日期字符串
+  // 获取当前日期用于截图目录
   const today = new Date();
   const yyyy = today.getFullYear();
   const mm = String(today.getMonth() + 1).padStart(2, '0');
   const dd = String(today.getDate()).padStart(2, '0');
   const dateDir = `${yyyy}-${mm}-${dd}`;
+  const screenshotDir = `/root/caoliao/screenshots/${dateDir}`;
 
-  // 定义截图目录
-  const baseDir = '/root/caoliao/screenshots';  // 改为你的服务器路径
-  const fullDir = path.join(baseDir, dateDir);
-
-  if (!fs.existsSync(fullDir)) {
-    fs.mkdirSync(fullDir, { recursive: true });
+  if (!fs.existsSync(screenshotDir)) {
+    fs.mkdirSync(screenshotDir, { recursive: true });
   }
 
   try {
-    // 1. 打开登录页
-    await page.goto('https://cli.im/login');
-    await page.waitForSelector('input[placeholder="请输入手机号"]');
-    await page.screenshot({ path: `${fullDir}/1-login-page.png` });
+    console.log('[1/4] 打开草料用户登录页...');
+    await page.goto('https://user.cli.im/login');
 
-    // 2. 输入账号密码
+    console.log('[2/4] 等待手机号输入框加载...');
+    await page.waitForSelector('input[placeholder="请输入手机号"]', { timeout: 10000 });
+
+    console.log('[3/4] 输入手机号与密码...');
     await page.fill('input[placeholder="请输入手机号"]', process.env.CAOLIAO_USERNAME);
     await page.fill('input[placeholder="请输入密码"]', process.env.CAOLIAO_PASSWORD);
-    await page.screenshot({ path: `${fullDir}/2-filled-credentials.png` });
 
-    // 3. 点击登录按钮
+    console.log('[4/4] 点击登录按钮...');
     await page.click('button:has-text("登录")');
-    await page.waitForTimeout(2000); // 等页面响应
-    await page.screenshot({ path: `${fullDir}/3-after-submit.png` });
 
-    // 4. 等待跳转后台首页
+    console.log('⏳ 等待跳转到后台首页...');
     await page.waitForURL('**/dashboard', { timeout: 15000 });
-    await page.waitForTimeout(3000);
-    await page.screenshot({ path: `${fullDir}/4-dashboard.png` });
 
-    console.log(`✅ 登录成功，截图已保存至 ${fullDir}`);
+    console.log('✅ 登录成功，已进入后台页面。');
 
-  } catch (error) {
-    const errPath = `${fullDir}/error.png`;
+  } catch (err) {
+    const errPath = path.join(screenshotDir, 'login-error.png');
     await page.screenshot({ path: errPath });
     console.error(`❌ 登录失败，错误截图保存在：${errPath}`);
+    console.error(err);
   } finally {
     await browser.close();
   }
