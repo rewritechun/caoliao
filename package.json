@@ -1,0 +1,11 @@
+{
+  "name": "autoweb",
+  "version": "1.0.0",
+  "main": "submit-ticket.js",
+  "scripts": {
+    "start": "node submit-ticket.js"
+  },
+  "dependencies": {
+    "playwright": "^1.52.0"
+  }
+}
