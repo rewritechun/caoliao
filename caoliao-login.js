@@ -49,17 +49,28 @@ const webhookUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=bc1fd31
     // ✅ 处理“多设备登录提醒”弹窗
     console.log('[6/6] 检查是否有弹窗提醒...');
     try {
-      const iKnowBtn = await page.waitForSelector('//a[contains(text(),"我知道了")]', { timeout: 3000 });
-      await iKnowBtn.click({ force: true });
-      console.log('✅ 已点击“我知道了”关闭弹窗');
-    } catch {
+      const popup = await page.waitForSelector('div.el-dialog__wrapper', { timeout: 5000 });
+      console.log('✅ 检测到弹窗提醒');
+
       try {
-        const closeIcon = await page.waitForSelector('//div[contains(@class,"dialog")]//button[contains(@class,"el-dialog__headerbtn")]', { timeout: 3000 });
-        await closeIcon.click({ force: true });
-        console.log('✅ 已点击弹窗右上角 ×');
+        const iKnowBtn = await page.waitForSelector('//a[contains(text(),"我知道了")]', { timeout: 2000 });
+        await iKnowBtn.click({ force: true });
+        console.log('✅ 已点击“我知道了”关闭弹窗');
       } catch {
-        console.log('⚠️ 未检测到“多设备登录提醒”弹窗，继续执行');
+        try {
+          const closeIcon = await page.waitForSelector('//div[contains(@class,"el-dialog__wrapper")]//button[contains(@class,"el-dialog__headerbtn")]', { timeout: 2000 });
+          await closeIcon.click({ force: true });
+          console.log('✅ 已点击弹窗右上角 ×');
+        } catch {
+          const warnPath = path.join(screenshotDir, 'popup-unhandled.png');
+          await page.screenshot({ path: warnPath });
+          console.log('⚠️ 弹窗存在但未成功关闭，已截图：', warnPath);
+        }
       }
+
+      await page.waitForTimeout(3000);
+    } catch {
+      console.log('✅ 未检测到弹窗提醒，继续执行');
     }
 
   } catch (err) {
