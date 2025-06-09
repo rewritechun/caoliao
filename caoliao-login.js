@@ -1,7 +1,10 @@
 const { chromium } = require('playwright');
 const fs = require('fs');
 const path = require('path');
+const axios = require('axios');
 require('dotenv').config();
+
+const webhookUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=bc1fd31b-18ef-454b-a946-65f48392bd98';
 
 (async () => {
   const browser = await chromium.launch({
@@ -62,9 +65,26 @@ require('dotenv').config();
 
   } catch (err) {
     const errPath = path.join(screenshotDir, 'login-error.png');
-    await page.screenshot({ path: errPath });
-    console.error(`❌ 登录失败，错误截图保存在：${errPath}`);
-    console.error(err);
+    try {
+      await page.screenshot({ path: errPath, timeout: 5000 });
+      console.error(`❌ 登录失败，错误截图保存在：${errPath}`);
+
+      await axios.post(webhookUrl, {
+        msgtype: "markdown",
+        markdown: {
+          content: `**草料二维码登录失败**\n当前页面：${page.url()}\n错误信息：${err.message}`
+        }
+      });
+    } catch (screenshotError) {
+      console.error('⚠️ 页面截图失败，可能页面已关闭或加载异常');
+
+      await axios.post(webhookUrl, {
+        msgtype: "markdown",
+        markdown: {
+          content: `**草料二维码登录失败**\n截图失败，错误信息：${err.message}`
+        }
+      });
+    }
   } finally {
     await browser.close();
   }
