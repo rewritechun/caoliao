@@ -4,7 +4,7 @@ const path = require('path');
 require('dotenv').config();
 
 (async () => {
-  const browser = await chromium.launch({ headless: false });
+  const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
 
   // 获取今天日期字符串
