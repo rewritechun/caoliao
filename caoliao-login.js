@@ -64,6 +64,7 @@ const webhookUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=bc1fd31
     }
 
   } catch (err) {
+    console.error('当前页面地址：', page.url());
     const errPath = path.join(screenshotDir, 'login-error.png');
     try {
       await page.screenshot({ path: errPath, timeout: 5000 });
