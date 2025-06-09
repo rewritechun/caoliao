@@ -1,66 +1,67 @@
 const { chromium } = require('playwright');
-const fs = require('fs');
-const path = require('path');
-require('dotenv').config();
+const dotenv = require('dotenv');
+dotenv.config();
 
 (async () => {
-  const browser = await chromium.launch({
-    headless: true,
-    args: ['--no-sandbox']
-  });
-
+  const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
   const page = await browser.newPage();
 
-  // 日期文件夹
   const today = new Date();
   const yyyy = today.getFullYear();
   const mm = String(today.getMonth() + 1).padStart(2, '0');
   const dd = String(today.getDate()).padStart(2, '0');
-  const dateDir = `${yyyy}-${mm}-${dd}`;
-  const screenshotDir = `/root/caoliao/screenshots/${dateDir}`;
-  if (!fs.existsSync(screenshotDir)) {
-    fs.mkdirSync(screenshotDir, { recursive: true });
-  }
+  const dateStr = `${yyyy}-${mm}-${dd}`;
 
   try {
-    console.log('[1/6] 打开草料二维码用户登录页...');
+    console.log(`[1/6] 登录草料二维码...`);
     await page.goto('https://user.cli.im/login');
-
-    console.log('[2/6] 等待手机号密码输入框...');
-    await page.waitForSelector('input[placeholder="请输入手机号"]', { timeout: 10000 });
-
-    console.log('[3/6] 输入账号密码...');
     await page.fill('input[placeholder="请输入手机号"]', process.env.CAOLIAO_USERNAME);
     await page.fill('input[placeholder="请输入密码"]', process.env.CAOLIAO_PASSWORD);
-
-    console.log('[4/6] 点击登录按钮...');
     await page.click('xpath=//*[@id="login-btn"]');
+    await page.waitForURL('**/dashboard');
 
-    console.log('[5/6] 等待后台跳转...');
-    await page.waitForURL('**/dashboard', { timeout: 15000 });
-    console.log('✅ 登录成功！');
-
-    // ✅ 检查并关闭弹窗
-    console.log('[6/6] 检查是否有弹窗提醒...');
+    // 关闭弹窗（可选）
     try {
-      const knowBtn = await page.waitForSelector('//button[contains(text(),"我知道了")]', { timeout: 5000 });
+      const knowBtn = await page.waitForSelector('//button[contains(text(),"我知道了")]', { timeout: 3000 });
       await knowBtn.click({ force: true });
-      console.log('🔘 已点击“我知道了”关闭弹窗');
-    } catch {
-      try {
-        const closeBtn = await page.waitForSelector('//div[contains(@class,"modal")]//i[contains(@class,"close")]', { timeout: 3000 });
-        await closeBtn.click({ force: true });
-        console.log('❌ 已点击右上角关闭弹窗');
-      } catch {
-        console.log('✅ 无弹窗或弹窗已自动消失，继续执行');
-      }
+    } catch {}
+
+    console.log(`[2/6] 点击交接班登记的全部数据链接...`);
+    await page.click('xpath=//*[@id="recentUpdateBlock"]/div/div[2]/div[1]/div[2]/div[1]/div[2]/div[2]/div[2]/div[2]/div[2]/div[2]/div/span[8]');
+    await page.waitForSelector('text=交接班留言');
+
+    console.log(`[3/6] 提取早班与晚班留言...`);
+    const records = await page.$$('div:has-text("交接班留言")');
+    let early = null, late = null;
+
+    for (const record of records) {
+      const textContent = await record.innerText();
+      if (!textContent.includes(dateStr)) continue;
+      if (!textContent.includes('交接班留言')) continue;
+
+      const matchTime = textContent.match(/\d{2}:\d{2}/);
+      const matchComment = textContent.match(/交接班留言[:：]\s*(.*)/);
+      const matchShift = textContent.match(/接班班次[:：]\s*(.*)/);
+
+      if (!matchTime || !matchComment || !matchShift) continue;
+
+      const time = matchTime[0];
+      const comment = matchComment[1].trim();
+      const shift = matchShift[1];
+
+      if (shift.includes('早班') && !early) early = `${dateStr} 早班留言：${comment}`;
+      if (shift.includes('晚班') && !late) late = `${dateStr} 晚班留言：${comment}`;
+
+      if (early && late) break;
     }
 
+    console.log('-----------------------------');
+    console.log(early ? `✅ ${early}` : `⚠️ 未找到早班留言`);
+    console.log(late ? `✅ ${late}` : `⚠️ 未找到晚班留言`);
+    console.log('-----------------------------');
+
   } catch (err) {
-    const errPath = path.join(screenshotDir, 'login-error.png');
-    await page.screenshot({ path: errPath });
-    console.error(`❌ 登录失败，错误截图保存在：${errPath}`);
-    console.error(err);
+    console.error('❌ 提取失败:', err);
   } finally {
     await browser.close();
   }
