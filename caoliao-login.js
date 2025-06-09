@@ -25,33 +25,31 @@ const webhookUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=bc1fd31
   }
 
   try {
-    console.log('[1/6] 打开草料二维码用户登录页...');
+    console.log('[1/7] 打开草料二维码用户登录页...');
     await page.goto('https://user.cli.im/login');
     await page.waitForTimeout(3000);
 
-    console.log('[2/6] 等待手机号密码输入框...');
+    console.log('[2/7] 等待手机号密码输入框...');
     await page.waitForSelector('input[placeholder="请输入手机号"]', { timeout: 10000 });
     await page.waitForTimeout(3000);
 
-    console.log('[3/6] 输入账号密码...');
+    console.log('[3/7] 输入账号密码...');
     await page.fill('input[placeholder="请输入手机号"]', process.env.CAOLIAO_USERNAME);
     await page.fill('input[placeholder="请输入密码"]', process.env.CAOLIAO_PASSWORD);
     await page.waitForTimeout(3000);
 
-    console.log('[4/6] 点击登录按钮...');
+    console.log('[4/7] 点击登录按钮...');
     await page.click('xpath=//*[@id="login-btn"]');
     await page.waitForTimeout(5000);
 
-    console.log('[5/6] 等待后台跳转...');
+    console.log('[5/7] 等待后台跳转...');
     await page.waitForURL((url) => typeof url === 'string' && url.includes('/center'), { timeout: 15000 });
     console.log('✅ 登录成功，已进入后台页面！');
 
-    // ✅ 处理“多设备登录提醒”弹窗
-    console.log('[6/6] 检查是否有弹窗提醒...');
+    console.log('[6/7] 检查是否有弹窗提醒...');
     try {
       const popup = await page.waitForSelector('div.el-dialog__wrapper', { timeout: 5000 });
       console.log('✅ 检测到弹窗提醒');
-
       try {
         const iKnowBtn = await page.waitForSelector('//a[contains(text(),"我知道了")]', { timeout: 2000 });
         await iKnowBtn.click({ force: true });
@@ -67,10 +65,20 @@ const webhookUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=bc1fd31
           console.log('⚠️ 弹窗存在但未成功关闭，已截图：', warnPath);
         }
       }
-
       await page.waitForTimeout(3000);
     } catch {
       console.log('✅ 未检测到弹窗提醒，继续执行');
+    }
+
+    console.log('[7/7] 点击“交接班登记”卡片的“全部记录”链接...');
+    try {
+      const fullLink = await page.waitForSelector('xpath=//*[@id="recentUpdateBlock"]//span[contains(text(),"全部")]', { timeout: 5000 });
+      await fullLink.click();
+      console.log('✅ 已点击“全部记录”链接');
+    } catch (e) {
+      const errPath = path.join(screenshotDir, 'click-full-error.png');
+      await page.screenshot({ path: errPath });
+      console.error('❌ 点击“全部记录”失败，截图保存在：', errPath);
     }
 
   } catch (err) {
