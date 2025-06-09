@@ -1,7 +1,10 @@
-FROM mcr.microsoft.com/playwright:v1.52.0-jammy
+FROM mcr.microsoft.com/playwright:v1.43.1-jammy
 
-WORKDIR /app
+WORKDIR /usr/src/app
+
+COPY package.json .
+RUN npm install
+
 COPY . .
-RUN yarn install
 
-CMD ["yarn", "start"]
+CMD ["node", "caoliao-login.js"]
