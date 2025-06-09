@@ -47,21 +47,49 @@ const webhookUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=bc1fd31
     console.log('✅ 登录成功，已进入后台页面！');
 
     console.log('[6/7] 检查是否有弹窗提醒...');
+try {
+  const popup = await page.waitForSelector('div.el-dialog__wrapper', { timeout: 6000 });
+  console.log('✅ 检测到弹窗提醒');
+
+  // 尝试点击“我知道了”
+  const iKnowOptions = [
+    '//a[contains(text(),"我知道了")]',
+    '//a[contains(@class,"el-button") and contains(text(),"我知道了")]',
+    '//button[contains(text(),"我知道了")]'
+  ];
+
+  let clicked = false;
+  for (const xpath of iKnowOptions) {
     try {
-      const popup = await page.waitForSelector('div.el-dialog__wrapper', { timeout: 5000 });
-      console.log('✅ 检测到弹窗提醒');
-      try {
-        const iKnowBtn = await page.waitForSelector('//a[contains(text(),"我知道了")]', { timeout: 2000 });
-        await iKnowBtn.click({ force: true });
-        console.log('✅ 已点击“我知道了”关闭弹窗');
-      } catch {
-        try {
-          const closeIcon = await page.waitForSelector('//div[contains(@class,"el-dialog__wrapper")]//button[contains(@class,"el-dialog__headerbtn")]', { timeout: 2000 });
-          await closeIcon.click({ force: true });
-          console.log('✅ 已点击弹窗右上角 ×');
-        } catch {
-          const warnPath = path.join(screenshotDir, 'popup-unhandled.png');
-          await page.waitForTimeout(3000);
+      const btn = await page.waitForSelector(`xpath=${xpath}`, { timeout: 1500 });
+      await btn.click({ force: true });
+      console.log(`✅ 点击弹窗按钮成功: ${xpath}`);
+      clicked = true;
+      break;
+    } catch {}
+  }
+
+  // 尝试点击右上角关闭按钮
+  if (!clicked) {
+    try {
+      const closeIcon = await page.waitForSelector('//div[contains(@class,"el-dialog__wrapper")]//button[contains(@class,"el-dialog__headerbtn")]', { timeout: 1500 });
+      await closeIcon.click({ force: true });
+      console.log('✅ 已点击弹窗右上角 ×');
+      clicked = true;
+    } catch {}
+  }
+
+  if (!clicked) {
+    const warnPath = path.join(screenshotDir, 'popup-unhandled.png');
+    await page.waitForTimeout(1000);
+    await page.screenshot({ path: warnPath });
+    console.warn('⚠️ 弹窗存在但未能成功关闭，已截图：', warnPath);
+  }
+
+  await page.waitForTimeout(3000);
+} catch {
+  console.log('✅ 未检测到弹窗提醒，继续执行');
+}
           await page.screenshot({ path: warnPath });
           console.log('⚠️ 弹窗存在但未成功关闭，已截图：', warnPath);
         }
