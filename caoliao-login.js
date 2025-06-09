@@ -7,11 +7,7 @@ require('dotenv').config();
 const webhookUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=bc1fd31b-18ef-454b-a946-65f48392bd98';
 
 (async () => {
-  const browser = await chromium.launch({
-    headless: true,
-    args: ['--no-sandbox']
-  });
-
+  const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
   const page = await browser.newPage();
 
   const today = new Date();
@@ -40,56 +36,43 @@ const webhookUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=bc1fd31
 
     console.log('[4/7] 点击登录按钮...');
     await page.click('xpath=//*[@id="login-btn"]');
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(3000);
 
     console.log('[5/7] 等待后台跳转...');
-    await page.waitForURL((url) => typeof url === 'string' && url.includes('/center'), { timeout: 15000 });
-    console.log('✅ 登录成功，已进入后台页面！');
-
-    console.log('[6/7] 检查是否有弹窗提醒...');
     try {
-      const popup = await page.waitForSelector('div.el-dialog__wrapper', { timeout: 6000 });
-      console.log('✅ 检测到弹窗提醒');
+      await page.waitForNavigation({ url: /center/, waitUntil: 'load', timeout: 15000 });
+    } catch (e) {
+      console.warn('⚠️ 未检测到页面跳转，继续尝试识别弹窗...');
+    }
+    console.log('当前页面地址：', page.url());
 
-      const iKnowOptions = [
-        '//a[contains(text(),"我知道了")]',
-        '//a[contains(@class,"el-button") and contains(text(),"我知道了")]',
-        '//button[contains(text(),"我知道了")]'
-      ];
-
-      let clicked = false;
-      for (const xpath of iKnowOptions) {
-        try {
-          const btn = await page.waitForSelector(`xpath=${xpath}`, { timeout: 1500 });
-          await btn.click({ force: true });
-          console.log(`✅ 点击弹窗按钮成功: ${xpath}`);
-          clicked = true;
-          break;
-        } catch {}
+    // 新弹窗关闭逻辑
+    const dialogs = await page.$$('xpath=//*[contains(@class,"dialog")]');
+    if (dialogs.length > 0) {
+      console.log(`⚠️ 检测到 ${dialogs.length} 个疑似弹窗，尝试关闭...`);
+      const iknowBtn = await page.$('xpath=//a[contains(text(),"我知道了") or contains(text(),"知道")]');
+      if (iknowBtn) {
+        await iknowBtn.click();
+        console.log('✅ 成功点击“我知道了”按钮');
+        await page.waitForTimeout(3000);
+      } else {
+        const closeBtn = await page.$('xpath=//button[contains(@class,"close") or contains(@class,"headerbtn")]');
+        if (closeBtn) {
+          await closeBtn.click();
+          console.log('✅ 成功点击弹窗关闭按钮');
+          await page.waitForTimeout(3000);
+        }
       }
-
-      if (!clicked) {
-        try {
-          const closeIcon = await page.waitForSelector('//div[contains(@class,"el-dialog__wrapper")]//button[contains(@class,"el-dialog__headerbtn")]', { timeout: 1500 });
-          await closeIcon.click({ force: true });
-          console.log('✅ 已点击弹窗右上角 ×');
-          clicked = true;
-        } catch {}
-      }
-
-      if (!clicked) {
-        const warnPath = path.join(screenshotDir, 'popup-unhandled.png');
-        await page.waitForTimeout(1000);
-        await page.screenshot({ path: warnPath });
-        console.warn('⚠️ 弹窗存在但未能成功关闭，已截图：', warnPath);
-      }
-
-      await page.waitForTimeout(3000);
-    } catch {
+    } else {
       console.log('✅ 未检测到弹窗提醒，继续执行');
     }
 
-    console.log('[7/7] 点击“交接班登记”卡片的“全部记录”链接...');
+    // 再次确认是否进入后台
+    if (!page.url().includes('/center')) {
+      throw new Error('未成功跳转后台页面');
+    }
+
+    console.log('[6/7] 点击“交接班登记”卡片的“全部记录”链接...');
     try {
       const fullLink = await page.waitForSelector('xpath=//*[@id="recentUpdateBlock"]//span[contains(text(),"全部") and contains(text(),"条")]', { timeout: 5000 });
       await fullLink.click();
@@ -108,7 +91,6 @@ const webhookUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=bc1fd31
       await page.waitForTimeout(3000);
       await page.screenshot({ path: errPath, timeout: 5000 });
       console.error(`❌ 登录失败，错误截图保存在：${errPath}`);
-
       await axios.post(webhookUrl, {
         msgtype: "markdown",
         markdown: {
@@ -117,7 +99,6 @@ const webhookUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=bc1fd31
       });
     } catch (screenshotError) {
       console.error('⚠️ 页面截图失败，可能页面已关闭或加载异常');
-
       await axios.post(webhookUrl, {
         msgtype: "markdown",
         markdown: {
