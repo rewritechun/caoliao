@@ -77,31 +77,16 @@ const webhookUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=bc1fd31
       throw new Error('未成功跳转后台页面，当前地址：' + finalUrl);
     }
 
-    console.log('[6/7] 搜索“全部记录”按钮...');
-    const allButtons = await page.$$('xpath=//*[@id="recentUpdateBlock"]//span');
-    let found = false;
-    for (const btn of allButtons) {
-      const text = await btn.innerText();
-      if (/^全部\d+条$/.test(text.trim())) {
-        console.log(`✅ 找到按钮: ${text}`);
-        await btn.click();
-        found = true;
-        await page.waitForTimeout(3000);
-        break;
-      }
-    }
-
-    if (!found) {
+    console.log('[6/7] 点击“交接班登记”卡片的“全部记录”链接...');
+    try {
+      const fullLink = await page.waitForSelector('xpath=//*[@id="recentUpdateBlock"]/div/div[2]/div[1]/div[2]/div[1]/div[2]/div[2]/div[2]/div[2]/div[2]/div[2]/div/span[8]', { timeout: 5000 });
+      await fullLink.click();
+      console.log('✅ 已点击“全部记录”链接');
+    } catch (e) {
       const errPath = path.join(screenshotDir, 'click-full-error.png');
       await page.waitForTimeout(3000);
       await page.screenshot({ path: errPath });
-      console.error('❌ 未能识别“全部记录”按钮，截图保存在：', errPath);
-      await axios.post(webhookUrl, {
-        msgtype: "markdown",
-        markdown: {
-          content: `**草料二维码识别失败**\n原因：无法识别“全部记录”按钮，请检查页面是否变动。`
-        }
-      });
+      console.error('❌ 点击“全部记录”失败，截图保存在：', errPath);
     }
 
   } catch (err) {
