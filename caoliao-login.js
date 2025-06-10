@@ -60,13 +60,16 @@ const webhookUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=bc1fd31
     console.log('当前页面地址：', page.url());
 
     const possibleDialogXPath = [
-      '//a[contains(text(),"我知道了")]',
-      '//a[contains(text(),"知道")]',
-      '//button/span/i/svg[contains(@class,"el-icon-close")]',
-      '//div[contains(@class,"el-dialog")]//button[contains(@class,"close")]',
-      '/html/body/div[19]/div/div[2]/div/div[2]/div/button/span/i/svg',
-      '/html/body/div[19]/div/div[2]/div/div[2]/div/div[4]/a[2]'
-    ];
+  '//a[contains(text(),"我知道了")]',
+  '//a[contains(text(),"知道")]',
+  '//button/span/i/svg[contains(@class,"el-icon-close")]',
+  '//div[contains(@class,"el-dialog")]//button[contains(@class,"close")]',
+  '/html/body/div[19]/div/div[2]/div/div[2]/div/button/span/i/svg',
+  '/html/body/div[19]/div/div[2]/div/div[2]/div/div[4]/a[2]',
+  '/html/body/div[contains(@class,"el-dialog")]//a[contains(text(),"我知道了")]',
+  '/html/body//a[contains(text(),"我知道了")]',
+  '//div[contains(text(),"多设备登录提醒")]/following::a[contains(text(),"我知道了")]'
+];
 
     let dialogClosed = false;
     for (const xpath of possibleDialogXPath) {
