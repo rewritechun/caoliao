@@ -46,30 +46,35 @@ const webhookUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=bc1fd31
     }
     console.log('当前页面地址：', page.url());
 
-    // 新弹窗关闭逻辑
-    const dialogs = await page.$$('xpath=//*[contains(@class,"dialog")]');
-    if (dialogs.length > 0) {
-      console.log(`⚠️ 检测到 ${dialogs.length} 个疑似弹窗，尝试关闭...`);
-      const iknowBtn = await page.$('xpath=//a[contains(text(),"我知道了") or contains(text(),"知道")]');
-      if (iknowBtn) {
-        await iknowBtn.click();
-        console.log('✅ 成功点击“我知道了”按钮');
+    const possibleDialogXPath = [
+      '//a[contains(text(),"我知道了")]',
+      '//a[contains(text(),"知道")]',
+      '//button/span/i/svg[contains(@class,"el-icon-close")]',
+      '//div[contains(@class,"el-dialog")]//button[contains(@class,"close")]'
+    ];
+
+    let dialogClosed = false;
+    for (const xpath of possibleDialogXPath) {
+      const element = await page.$(`xpath=${xpath}`);
+      if (element) {
+        await element.click();
+        console.log(`✅ 成功点击弹窗元素: ${xpath}`);
+        dialogClosed = true;
         await page.waitForTimeout(3000);
-      } else {
-        const closeBtn = await page.$('xpath=//button[contains(@class,"close") or contains(@class,"headerbtn")]');
-        if (closeBtn) {
-          await closeBtn.click();
-          console.log('✅ 成功点击弹窗关闭按钮');
-          await page.waitForTimeout(3000);
-        }
+        break;
       }
-    } else {
-      console.log('✅ 未检测到弹窗提醒，继续执行');
     }
 
-    // 再次确认是否进入后台
-    if (!page.url().includes('/center')) {
-      throw new Error('未成功跳转后台页面');
+    if (!dialogClosed) {
+      console.log('✅ 未检测到需关闭的弹窗');
+    }
+
+    await page.waitForTimeout(3000);
+    const finalUrl = page.url();
+    console.log('最终页面地址：', finalUrl);
+
+    if (!finalUrl.includes('/center')) {
+      throw new Error('未成功跳转后台页面，当前地址：' + finalUrl);
     }
 
     console.log('[6/7] 点击“交接班登记”卡片的“全部记录”链接...');
