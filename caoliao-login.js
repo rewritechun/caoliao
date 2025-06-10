@@ -1,4 +1,4 @@
-const { chromium } = require('playwright');
+""const { chromium } = require('playwright');
 const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
@@ -94,24 +94,27 @@ const webhookUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=bc1fd31
 
     console.log('[6/7] 点击“交接班登记”卡片的“全部记录”链接...');
     try {
-      const allRecordsXpath = '//*[@id="recentUpdateBlock"]//span[contains(text(),"全部") and contains(text(),"条")]';
-      const fullLink = await page.waitForSelector(`xpath=${allRecordsXpath}`, { timeout: 5000 });
-      await fullLink.click();
+      const recordXPath = '//*[@id="recentUpdateBlock"]//span[contains(text(),"全部") and contains(text(),"条")]';
+      const recordElement = await page.waitForSelector(`xpath=${recordXPath}`, { timeout: 5000 });
+      await recordElement.click();
       console.log('✅ 已点击“全部记录”链接');
     } catch (e) {
       console.error('❌ 点击“全部记录”失败');
       const screenshotPath = path.join(screenshotDir, `${yyyy}-${mm}-${dd}-click-record-fail.png`);
-      await page.screenshot({ path: screenshotPath });
-      await axios.post(webhookUrl, {
-        msgtype: "markdown",
-        markdown: {
-          content: `**草料二维码操作失败**\n点击“全部记录”失败，错误信息：${e.message}\n![错误截图](${screenshotPath})`
-        }
-      });
+      try {
+        await page.screenshot({ path: screenshotPath });
+        await axios.post(webhookUrl, {
+          msgtype: "markdown",
+          markdown: {
+            content: `**草料二维码操作失败**\n点击“全部记录”失败，错误信息：${e.message}\n![错误截图](${screenshotPath})`
+          }
+        });
+      } catch (sErr) {
+        console.warn('⚠️ 页面截图失败或推送失败');
+      }
       return;
     }
 
-    // 每月1号将上月PDF打包
     if (dd === '01') {
       const lastMonth = new Date(yyyy, parseInt(mm) - 2, 1);
       const lastMM = String(lastMonth.getMonth() + 1).padStart(2, '0');
@@ -139,7 +142,7 @@ const webhookUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=bc1fd31
       }
     }
 
-    // 留言与PDF提取逻辑将在下一个模块中补充
+    // 留言与PDF提取逻辑将在后续模块补充
 
   } catch (err) {
     const errorShot = path.join(screenshotDir, `${yyyy}-${mm}-${dd}-login-error.png`);
