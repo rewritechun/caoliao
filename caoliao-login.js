@@ -19,8 +19,9 @@ const webhookUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=bc1fd31
   const baseDir = '/root/caoliao';
   const logDir = path.join(baseDir, 'logs', dateDir);
   const pdfDir = path.join(baseDir, 'pdf', dateDir);
+  const screenshotDir = path.join(baseDir, 'screenshots');
 
-  [logDir, pdfDir].forEach(dir => {
+  [logDir, pdfDir, screenshotDir].forEach(dir => {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
@@ -99,10 +100,12 @@ const webhookUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=bc1fd31
       console.log('✅ 已点击“全部记录”链接');
     } catch (e) {
       console.error('❌ 点击“全部记录”失败');
+      const screenshotPath = path.join(screenshotDir, `${yyyy}-${mm}-${dd}-click-record-fail.png`);
+      await page.screenshot({ path: screenshotPath });
       await axios.post(webhookUrl, {
         msgtype: "markdown",
         markdown: {
-          content: `**草料二维码操作失败**\n点击“全部记录”失败，错误信息：${e.message}`
+          content: `**草料二维码操作失败**\n点击“全部记录”失败，错误信息：${e.message}\n![错误截图](${screenshotPath})`
         }
       });
       return;
@@ -139,7 +142,12 @@ const webhookUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=bc1fd31
     // 留言与PDF提取逻辑将在下一个模块中补充
 
   } catch (err) {
-    console.error('当前页面地址：', page.url());
+    const errorShot = path.join(screenshotDir, `${yyyy}-${mm}-${dd}-login-error.png`);
+    try {
+      await page.screenshot({ path: errorShot });
+    } catch (e) {
+      console.warn('⚠️ 页面截图失败，可能页面已关闭或加载异常');
+    }
     await axios.post(webhookUrl, {
       msgtype: "markdown",
       markdown: {
