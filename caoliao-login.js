@@ -2,6 +2,7 @@ const { chromium } = require('playwright');
 const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
+const archiver = require('archiver');
 require('dotenv').config();
 
 const webhookUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=bc1fd31b-18ef-454b-a946-65f48392bd98';
@@ -15,9 +16,19 @@ const webhookUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=bc1fd31
   const mm = String(today.getMonth() + 1).padStart(2, '0');
   const dd = String(today.getDate()).padStart(2, '0');
   const dateDir = `${yyyy}-${mm}-${dd}`;
-  const screenshotDir = `/root/caoliao/screenshots/${dateDir}`;
-  if (!fs.existsSync(screenshotDir)) {
-    fs.mkdirSync(screenshotDir, { recursive: true });
+  const baseDir = '/root/caoliao';
+  const logDir = path.join(baseDir, 'logs', dateDir);
+  const pdfDir = path.join(baseDir, 'pdf', dateDir);
+
+  [logDir, pdfDir].forEach(dir => {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+  });
+
+  const recordLogPath = path.join(logDir, 'extract.log');
+  if (!fs.existsSync(recordLogPath)) {
+    fs.writeFileSync(recordLogPath, '');
   }
 
   try {
@@ -44,13 +55,16 @@ const webhookUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=bc1fd31
     } catch (e) {
       console.warn('⚠️ 未检测到页面跳转，继续尝试识别弹窗...');
     }
+
     console.log('当前页面地址：', page.url());
 
     const possibleDialogXPath = [
       '//a[contains(text(),"我知道了")]',
       '//a[contains(text(),"知道")]',
       '//button/span/i/svg[contains(@class,"el-icon-close")]',
-      '//div[contains(@class,"el-dialog")]//button[contains(@class,"close")]'
+      '//div[contains(@class,"el-dialog")]//button[contains(@class,"close")]',
+      '/html/body/div[19]/div/div[2]/div/div[2]/div/button/span/i/svg',
+      '/html/body/div[19]/div/div[2]/div/div[2]/div/div[4]/a[2]'
     ];
 
     let dialogClosed = false;
@@ -79,38 +93,59 @@ const webhookUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=bc1fd31
 
     console.log('[6/7] 点击“交接班登记”卡片的“全部记录”链接...');
     try {
-      const fullLink = await page.waitForSelector('xpath=//*[@id="recentUpdateBlock"]/div/div[2]/div[1]/div[2]/div[1]/div[2]/div[2]/div[2]/div[2]/div[2]/div[2]/div/span[8]', { timeout: 5000 });
+      const allRecordsXpath = '//*[@id="recentUpdateBlock"]//span[contains(text(),"全部") and contains(text(),"条")]';
+      const fullLink = await page.waitForSelector(`xpath=${allRecordsXpath}`, { timeout: 5000 });
       await fullLink.click();
       console.log('✅ 已点击“全部记录”链接');
     } catch (e) {
-      const errPath = path.join(screenshotDir, 'click-full-error.png');
-      await page.waitForTimeout(3000);
-      await page.screenshot({ path: errPath });
-      console.error('❌ 点击“全部记录”失败，截图保存在：', errPath);
+      console.error('❌ 点击“全部记录”失败');
+      await axios.post(webhookUrl, {
+        msgtype: "markdown",
+        markdown: {
+          content: `**草料二维码操作失败**\n点击“全部记录”失败，错误信息：${e.message}`
+        }
+      });
+      return;
     }
+
+    // 每月1号将上月PDF打包
+    if (dd === '01') {
+      const lastMonth = new Date(yyyy, parseInt(mm) - 2, 1);
+      const lastMM = String(lastMonth.getMonth() + 1).padStart(2, '0');
+      const lastYYYY = lastMonth.getFullYear();
+      const targetDir = path.join(baseDir, 'pdf', `${lastYYYY}-${lastMM}`);
+
+      if (fs.existsSync(targetDir)) {
+        const zipPath = path.join(targetDir, `${lastYYYY}-${lastMM}.zip`);
+        const output = fs.createWriteStream(zipPath);
+        const archive = archiver('zip', { zlib: { level: 9 } });
+
+        output.on('close', async () => {
+          const summary = `📦 草料二维码：${lastYYYY}年${lastMM}月PDF打包完成，共${archive.pointer()}字节。`;
+          console.log(summary);
+          await axios.post(webhookUrl, {
+            msgtype: "markdown",
+            markdown: { content: `**${summary}**` }
+          });
+        });
+
+        archive.on('error', err => { throw err; });
+        archive.pipe(output);
+        archive.directory(targetDir, false);
+        await archive.finalize();
+      }
+    }
+
+    // 留言与PDF提取逻辑将在下一个模块中补充
 
   } catch (err) {
     console.error('当前页面地址：', page.url());
-    const errPath = path.join(screenshotDir, 'login-error.png');
-    try {
-      await page.waitForTimeout(3000);
-      await page.screenshot({ path: errPath, timeout: 5000 });
-      console.error(`❌ 登录失败，错误截图保存在：${errPath}`);
-      await axios.post(webhookUrl, {
-        msgtype: "markdown",
-        markdown: {
-          content: `**草料二维码登录失败**\n当前页面：${page.url()}\n错误信息：${err.message}`
-        }
-      });
-    } catch (screenshotError) {
-      console.error('⚠️ 页面截图失败，可能页面已关闭或加载异常');
-      await axios.post(webhookUrl, {
-        msgtype: "markdown",
-        markdown: {
-          content: `**草料二维码登录失败**\n截图失败，错误信息：${err.message}`
-        }
-      });
-    }
+    await axios.post(webhookUrl, {
+      msgtype: "markdown",
+      markdown: {
+        content: `**草料二维码登录失败**\n当前页面：${page.url()}\n错误信息：${err.message}`
+      }
+    });
   } finally {
     await browser.close();
   }
