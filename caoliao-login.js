@@ -92,21 +92,26 @@ const webhookUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=bc1fd31
       throw new Error('未成功跳转后台页面，当前地址：' + finalUrl);
     }
 
-    console.log('[6/7] 点击“交接班登记”卡片的“全部记录”链接...');
+    console.log('[6/7] 点击“交接班登记”卡片标题...');
     try {
-      const recordXPath = '//*[@id="recentUpdateBlock"]/div/div[2]/div[1]/div[2]/div[1]/div[2]/div[2]/div[1]/div[1]/div/p';
-      const recordElement = await page.waitForSelector(`xpath=/html/body/div[22]/div/div[2]/div/div[2]/div/div/div/div/div/div[1]/div[2]/div/div/div/div/div[1]/div[4]/span/span/span/span`, { timeout: 5000 });
-      await recordElement.click();
-      console.log('✅ 已点击“全部记录”链接');
+      const titleXPath = '//*[@id="recentUpdateBlock"]/div/div[2]/div[1]/div[2]/div[1]/div[2]/div[2]/div[1]/div[1]/div/p';
+      const titleElement = await page.waitForSelector(`xpath=${titleXPath}`, { timeout: 5000 });
+      await titleElement.click();
+      console.log('✅ 已点击“交接班登记”标题，准备进入详情页');
+
+      const dynamicDataXPath = '/html/body/div[22]/div/div[2]/div/div[2]/div/div/div/div/div/div[1]/div[2]/div/div/div/div/div[1]/div[4]/span/span/span/span';
+      const dynamicElement = await page.waitForSelector(`xpath=${dynamicDataXPath}`, { timeout: 5000 });
+      await dynamicElement.click();
+      console.log('✅ 已点击“动态数据”');
     } catch (e) {
-      console.error('❌ 点击“全部记录”失败');
+      console.error('❌ 点击“交接班登记”标题或“动态数据”失败');
       const screenshotPath = path.join(screenshotDir, `${yyyy}-${mm}-${dd}-click-record-fail.png`);
       try {
         await page.screenshot({ path: screenshotPath });
         await axios.post(webhookUrl, {
           msgtype: "markdown",
           markdown: {
-            content: `**草料二维码操作失败**\n点击“全部记录”失败，错误信息：${e.message}\n![错误截图](${screenshotPath})`
+            content: `**草料二维码操作失败**\n点击交接班登记失败，错误信息：${e.message}`
           }
         });
       } catch (sErr) {
