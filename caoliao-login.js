@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const axios = require('axios');
 const { chromium } = require('playwright');
+require('dotenv').config();
 
 // ==== 时间处理 ====
 const today = new Date();
@@ -27,14 +28,35 @@ const dynamicDataXPath = '//*[contains(text(), "动态数据")]';
   const page = await browser.newPage();
 
   try {
-    // 登录部分请按你原有逻辑补充，假设此时 page 已登录
+    console.log('[1/7] 打开草料二维码用户登录页...');
+    await page.goto('https://user.cli.im/login');
 
-    // 确保目录存在
+    console.log('[2/7] 等待手机号密码输入框...');
+    await page.waitForSelector('input[name="phone"]');
+    await page.waitForSelector('input[name="password"]');
+
+    console.log('[3/7] 输入账号密码...');
+    await page.fill('input[name="phone"]', process.env.CAOLIAO_PHONE || '');
+    await page.fill('input[name="password"]', process.env.CAOLIAO_PASS || '');
+
+    console.log('[4/7] 点击登录按钮...');
+    await page.click('//*[@id="login-btn"]');
+
+    console.log('[5/7] 等待后台跳转...');
+    await page.waitForNavigation();
+    const currentUrl = page.url();
+    console.log('当前页面地址：', currentUrl);
+
+    const knownPopup = await page.$('text=我知道了');
+    if (knownPopup) {
+      await knownPopup.click();
+      console.log('✅ 已关闭提示弹窗');
+    }
+
     fs.mkdirSync(screenshotDir, { recursive: true });
     fs.mkdirSync(pdfDir, { recursive: true });
     fs.mkdirSync(path.dirname(recordLogPath), { recursive: true });
 
-    // 点击交接班登记标题
     const titleElement = await page.waitForSelector(`xpath=${titleXPath}`, { timeout: 5000 });
     await titleElement.click();
     console.log('✅ 已点击“交接班登记”标题，准备进入详情页');
