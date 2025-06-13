@@ -166,7 +166,14 @@ if (fs.existsSync(filepath)) {
 } else {
   const downloadBtn = await block.$('text=PDF下载');
   if (downloadBtn) {
-    console.log(`🎯 找到下载按钮，准备点击下载 ${filename}`);
+    console.log(`🎯 找到下载按钮，准备截图并尝试点击：${filename}`);
+
+    // 截图按钮可见状态
+    const beforeClickPath = path.join(screenshotDir, `${yyyy}-${mm}-${dd}-${label}-before-click.png`);
+    await downloadBtn.screenshot({ path: beforeClickPath }).catch(() => {
+      console.warn('⚠️ 截图前失败');
+    });
+
     try {
       const [ download ] = await Promise.all([
         page.waitForEvent('download', { timeout: 10000 }).catch(e => {
@@ -176,9 +183,11 @@ if (fs.existsSync(filepath)) {
         downloadBtn.click().then(() => console.log('✅ 下载按钮已点击'))
       ]);
 
-      console.log('🔔 下载事件已触发，开始保存文件...');
-      console.log(`📍 目标保存路径：${filepath}`);
+      // 点击后截图整个页面
+      const afterClickPath = path.join(screenshotDir, `${yyyy}-${mm}-${dd}-${label}-after-click.png`);
+      await page.screenshot({ path: afterClickPath });
 
+      console.log('🔔 下载事件已触发，开始保存文件...');
       await download.saveAs(filepath);
 
       if (fs.existsSync(filepath)) {
@@ -188,12 +197,16 @@ if (fs.existsSync(filepath)) {
       }
 
     } catch (e) {
+      const errorClickPath = path.join(screenshotDir, `${yyyy}-${mm}-${dd}-${label}-error.png`);
+      await page.screenshot({ path: errorClickPath });
       console.error(`❌ 下载流程出错：${filename}，错误信息：${e.message}`);
     }
+
   } else {
     console.log(`⚠️ 未找到下载按钮 ${filename}`);
   }
 }
+
 
 
       fs.appendFileSync(recordLogPath, `[${yyyy}-${mm}-${dd} ${label}] 交接班留言：${comment}\n`);
