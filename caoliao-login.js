@@ -150,7 +150,58 @@ const webhookUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=bc1fd31
       }
     }
 
-    // 留言与PDF提取逻辑将在后续模块补充
+    // 留言与PDF提取逻辑
+await page.waitForTimeout(3000);
+await page.mouse.wheel(0, 2000);
+
+const recordBlocks = await page.$$('div.card-record');
+let processed = { morning: false, evening: false };
+
+for (const block of recordBlocks) {
+  const timeText = await block.textContent();
+  if (!timeText) continue;
+
+  const matched = timeText.match(/(\d{2}):(\d{2})/);
+  if (!matched) continue;
+
+  const hour = parseInt(matched[1], 10);
+  const isMorning = hour >= 5 && hour < 12;
+  const isEvening = hour >= 17 && hour <= 23;
+
+  const label = isMorning ? '早班' : isEvening ? '晚班' : '';
+  if (!label || processed[label === '早班' ? 'morning' : 'evening']) continue;
+
+  const commentElement = await block.$('text=交接班留言');
+  const comment = commentElement ? await commentElement.textContent() : '未填写';
+  const filename = `${yyyy}-${mm}-${dd}-${label}.pdf`;
+  const filepath = path.join(pdfDir, filename);
+
+  if (fs.existsSync(filepath)) {
+    console.log(`📄 已存在 ${filename}，跳过下载`);
+  } else {
+    const downloadBtn = await block.$('text=PDF下载');
+    if (downloadBtn) {
+      await downloadBtn.click();
+      console.log(`⬇️ 已点击下载 ${filename}`);
+    } else {
+      console.log(`⚠️ 未找到下载按钮 ${filename}`);
+    }
+    await page.waitForTimeout(3000);
+  }
+
+  fs.appendFileSync(recordLogPath, `[${yyyy}-${mm}-${dd} ${label}] 交接班留言：${comment}\n`);
+  if (label === '早班') processed.morning = true;
+  if (label === '晚班') processed.evening = true;
+}
+
+const logText = fs.readFileSync(recordLogPath, 'utf8');
+await axios.post(webhookUrl, {
+  msgtype: 'markdown',
+  markdown: {
+    content: `**📋 今日交接班留言摘要（${yyyy}-${mm}-${dd}）**\n` + logText.replace(/\n/g, '\n')
+  }
+});
+
 
   } catch (err) {
     const errorShot = path.join(screenshotDir, `${yyyy}-${mm}-${dd}-login-error.png`);
