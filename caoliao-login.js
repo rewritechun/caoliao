@@ -102,7 +102,7 @@ const webhookUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=bc1fd31
       await titleElement.click();
       console.log('✅ 已点击“交接班登记”标题，准备进入详情页');
 
-      const dynamicDataXPath = '/html/body/div[22]/div/div[2]/div/div[2]/div/div/div/div/div/div[1]/div[2]/div/div/div/div/div[1]/div[4]/span/span/span/span';
+      const dynamicDataXPath = '//span[contains(text(),"动态数据")]';
       const dynamicElement = await page.waitForSelector(`xpath=${dynamicDataXPath}`, { timeout: 5000 });
       await dynamicElement.click();
       console.log('✅ 已点击“动态数据”');
