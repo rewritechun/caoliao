@@ -1,3 +1,5 @@
+const path = require('path');
+
 (async () => {
   // === 前面保持不变 ===
 
