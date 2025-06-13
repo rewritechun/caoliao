@@ -8,43 +8,46 @@ require('dotenv').config();
 const webhookUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=bc1fd31b-18ef-454b-a946-65f48392bd98';
 const mode = process.argv[2] || 'daily';
 
-// 📦 ZIP 模式（仅在月初打包使用）
+// ================== 月初压缩模式 ==================
 if (mode === 'zip') {
-  const today = new Date();
-  const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-  const yyyy = lastMonth.getFullYear();
-  const mm = String(lastMonth.getMonth() + 1).padStart(2, '0');
+  (async () => {
+    const today = new Date();
+    const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const yyyy = lastMonth.getFullYear();
+    const mm = String(lastMonth.getMonth() + 1).padStart(2, '0');
 
-  const baseDir = '/root/caoliao';
-  const targetDir = path.join(baseDir, 'pdf', `${yyyy}-${mm}`);
-  const zipPath = path.join(targetDir, `${yyyy}-${mm}.zip`);
+    const baseDir = '/root/caoliao';
+    const targetDir = path.join(baseDir, 'pdf', `${yyyy}-${mm}`);
+    const zipPath = path.join(targetDir, `${yyyy}-${mm}.zip`);
 
-  if (!fs.existsSync(targetDir)) {
-    console.error(`❌ 上月目录不存在：${targetDir}`);
-    process.exit(1);
-  }
+    if (!fs.existsSync(targetDir)) {
+      console.error(`❌ 上月目录不存在：${targetDir}`);
+      process.exit(1);
+    }
 
-  const output = fs.createWriteStream(zipPath);
-  const archive = archiver('zip', { zlib: { level: 9 } });
+    const output = fs.createWriteStream(zipPath);
+    const archive = archiver('zip', { zlib: { level: 9 } });
 
-  output.on('close', async () => {
-    const summary = `📦 草料二维码：${yyyy}年${mm}月PDF打包完成，共${archive.pointer()}字节。`;
-    console.log(summary);
-    await axios.post(webhookUrl, {
-      msgtype: "markdown",
-      markdown: { content: `**${summary}**` }
+    output.on('close', async () => {
+      const summary = `📦 草料二维码：${yyyy}年${mm}月PDF打包完成，共${archive.pointer()}字节。`;
+      console.log(summary);
+      await axios.post(webhookUrl, {
+        msgtype: "markdown",
+        markdown: { content: `**${summary}**` }
+      });
+      process.exit(0);
     });
-    process.exit(0);
-  });
 
-  archive.on('error', err => { throw err; });
-  archive.pipe(output);
-  archive.directory(targetDir, false);
-  await archive.finalize();
+    archive.on('error', err => { throw err; });
+    archive.pipe(output);
+    archive.directory(targetDir, false);
+    await archive.finalize();
+  })();
+
   return;
 }
 
-// 🗓 每日模式
+// ================== 每日交接班提取 ==================
 (async () => {
   const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
   const page = await browser.newPage();
@@ -96,7 +99,6 @@ if (mode === 'zip') {
       '//a[contains(text(),"知道")]',
       '//button/span/i/svg[contains(@class,"el-icon-close")]',
       '//div[contains(@class,"el-dialog")]//button[contains(@class,"close")]',
-      '/html/body/div[contains(@class,"el-dialog")]//a[contains(text(),"我知道了")]',
       '//div[contains(text(),"多设备登录提醒")]/following::a[contains(text(),"我知道了")]'
     ];
 
@@ -112,11 +114,7 @@ if (mode === 'zip') {
       }
     }
 
-    if (!dialogClosed) {
-      console.log('✅ 未检测到需关闭的弹窗');
-    }
-
-    console.log('最终页面地址：', page.url());
+    if (!dialogClosed) console.log('✅ 未检测到需关闭的弹窗');
 
     console.log('[6/7] 点击“交接班登记”卡片标题...');
     const titleXPath = '//*[@id="recentUpdateBlock"]/div/div[2]/div[1]/div[2]/div[1]/div[2]/div[2]/div[1]/div[1]/div/p';
