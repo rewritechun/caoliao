@@ -32,7 +32,6 @@ const dynamicDataXPath = '//*[contains(text(), "动态数据")]';
     await page.goto('https://user.cli.im/login');
 
     console.log('[2/7] 等待手机号密码输入框...');
-
     const pwdLoginLink = await page.$('text=账号密码登录');
     if (pwdLoginLink) {
       await pwdLoginLink.click();
@@ -40,7 +39,9 @@ const dynamicDataXPath = '//*[contains(text(), "动态数据")]';
     }
 
     await page.waitForSelector('input[name="phone"]', { timeout: 15000 });
+    console.log('✅ 找到手机号输入框');
     await page.waitForSelector('input[name="password"]', { timeout: 15000 });
+    console.log('✅ 找到密码输入框');
 
     console.log('[3/7] 输入账号密码...');
     await page.fill('input[name="phone"]', process.env.CAOLIAO_PHONE || '');
@@ -64,6 +65,7 @@ const dynamicDataXPath = '//*[contains(text(), "动态数据")]';
     fs.mkdirSync(pdfDir, { recursive: true });
     fs.mkdirSync(path.dirname(recordLogPath), { recursive: true });
 
+    console.log('[6/7] 点击“交接班登记”卡片标题...');
     const titleElement = await page.waitForSelector(`xpath=${titleXPath}`, { timeout: 5000 });
     await titleElement.click();
     console.log('✅ 已点击“交接班登记”标题，准备进入详情页');
@@ -138,11 +140,19 @@ const dynamicDataXPath = '//*[contains(text(), "动态数据")]';
 
   } catch (e) {
     const failShot = path.join(screenshotDir, `${dateDir}-click-fail.png`);
+    console.error('❌ 捕获异常，开始截图保存至：', failShot);
     await page.screenshot({ path: failShot });
-    await axios.post(webhookUrl, {
-      msgtype: "markdown",
-      markdown: { content: `**草料二维码操作失败**\n错误信息：${e.message}` }
-    });
+    console.error('📷 异常截图完成，准备推送企业微信...');
+    try {
+      await axios.post(webhookUrl, {
+        msgtype: "markdown",
+        markdown: {
+          content: `**草料二维码操作失败**\n错误信息：${e.message}\n截图路径：${failShot}`
+        }
+      });
+    } catch (err) {
+      console.error('❌ 企业微信推送失败：', err.message);
+    }
   } finally {
     await browser.close();
   }
