@@ -32,8 +32,15 @@ const dynamicDataXPath = '//*[contains(text(), "动态数据")]';
     await page.goto('https://user.cli.im/login');
 
     console.log('[2/7] 等待手机号密码输入框...');
-    await page.waitForSelector('input[name="phone"]');
-    await page.waitForSelector('input[name="password"]');
+
+    const pwdLoginLink = await page.$('text=账号密码登录');
+    if (pwdLoginLink) {
+      await pwdLoginLink.click();
+      console.log('🔁 已切换至账号密码登录页');
+    }
+
+    await page.waitForSelector('input[name="phone"]', { timeout: 15000 });
+    await page.waitForSelector('input[name="password"]', { timeout: 15000 });
 
     console.log('[3/7] 输入账号密码...');
     await page.fill('input[name="phone"]', process.env.CAOLIAO_PHONE || '');
