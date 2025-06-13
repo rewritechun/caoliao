@@ -161,25 +161,40 @@ if (mode === 'zip') {
       const filename = `${yyyy}-${mm}-${dd}-${label}.pdf`;
       const filepath = path.join(pdfDir, filename);
 
+if (fs.existsSync(filepath)) {
+  console.log(`📄 已存在 ${filename}，跳过下载`);
+} else {
+  const downloadBtn = await block.$('text=PDF下载');
+  if (downloadBtn) {
+    console.log(`🎯 找到下载按钮，准备点击下载 ${filename}`);
+    try {
+      const [ download ] = await Promise.all([
+        page.waitForEvent('download', { timeout: 10000 }).catch(e => {
+          console.error(`❌ 等待下载事件失败：${e.message}`);
+          throw e;
+        }),
+        downloadBtn.click().then(() => console.log('✅ 下载按钮已点击'))
+      ]);
+
+      console.log('🔔 下载事件已触发，开始保存文件...');
+      console.log(`📍 目标保存路径：${filepath}`);
+
+      await download.saveAs(filepath);
+
       if (fs.existsSync(filepath)) {
-        console.log(`📄 已存在 ${filename}，跳过下载`);
+        console.log(`✅ 成功保存 PDF 文件：${filepath}`);
       } else {
-        const downloadBtn = await block.$('text=PDF下载');
-        if (downloadBtn) {
-          try {
-            const [ download ] = await Promise.all([
-              page.waitForEvent('download', { timeout: 10000 }),
-              downloadBtn.click()
-            ]);
-            await download.saveAs(filepath);
-            console.log(`✅ PDF 下载完成：${filename}`);
-          } catch (e) {
-            console.error(`❌ PDF 下载失败：${filename}，错误：${e.message}`);
-          }
-        } else {
-          console.log(`⚠️ 未找到下载按钮 ${filename}`);
-        }
+        console.error(`❌ 保存失败，文件不存在：${filepath}`);
       }
+
+    } catch (e) {
+      console.error(`❌ 下载流程出错：${filename}，错误信息：${e.message}`);
+    }
+  } else {
+    console.log(`⚠️ 未找到下载按钮 ${filename}`);
+  }
+}
+
 
       fs.appendFileSync(recordLogPath, `[${yyyy}-${mm}-${dd} ${label}] 交接班留言：${comment}\n`);
       if (label === '早班') processed.morning = true;
