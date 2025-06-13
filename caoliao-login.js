@@ -6,7 +6,45 @@ const archiver = require('archiver');
 require('dotenv').config();
 
 const webhookUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=bc1fd31b-18ef-454b-a946-65f48392bd98';
+const mode = process.argv[2] || 'daily';
 
+// 📦 ZIP 模式（仅在月初打包使用）
+if (mode === 'zip') {
+  const today = new Date();
+  const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+  const yyyy = lastMonth.getFullYear();
+  const mm = String(lastMonth.getMonth() + 1).padStart(2, '0');
+
+  const baseDir = '/root/caoliao';
+  const targetDir = path.join(baseDir, 'pdf', `${yyyy}-${mm}`);
+  const zipPath = path.join(targetDir, `${yyyy}-${mm}.zip`);
+
+  if (!fs.existsSync(targetDir)) {
+    console.error(`❌ 上月目录不存在：${targetDir}`);
+    process.exit(1);
+  }
+
+  const output = fs.createWriteStream(zipPath);
+  const archive = archiver('zip', { zlib: { level: 9 } });
+
+  output.on('close', async () => {
+    const summary = `📦 草料二维码：${yyyy}年${mm}月PDF打包完成，共${archive.pointer()}字节。`;
+    console.log(summary);
+    await axios.post(webhookUrl, {
+      msgtype: "markdown",
+      markdown: { content: `**${summary}**` }
+    });
+    process.exit(0);
+  });
+
+  archive.on('error', err => { throw err; });
+  archive.pipe(output);
+  archive.directory(targetDir, false);
+  await archive.finalize();
+  return;
+}
+
+// 🗓 每日模式
 (async () => {
   const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
   const page = await browser.newPage();
@@ -22,15 +60,11 @@ const webhookUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=bc1fd31
   const screenshotDir = path.join(baseDir, 'screenshots');
 
   [logDir, pdfDir, screenshotDir].forEach(dir => {
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   });
 
   const recordLogPath = path.join(logDir, 'extract.log');
-  if (!fs.existsSync(recordLogPath)) {
-    fs.writeFileSync(recordLogPath, '');
-  }
+  if (!fs.existsSync(recordLogPath)) fs.writeFileSync(recordLogPath, '');
 
   try {
     console.log('[1/7] 打开草料二维码用户登录页...');
@@ -57,19 +91,14 @@ const webhookUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=bc1fd31
       console.warn('⚠️ 未检测到页面跳转，继续尝试识别弹窗...');
     }
 
-    console.log('当前页面地址：', page.url());
-
     const possibleDialogXPath = [
-  '//a[contains(text(),"我知道了")]',
-  '//a[contains(text(),"知道")]',
-  '//button/span/i/svg[contains(@class,"el-icon-close")]',
-  '//div[contains(@class,"el-dialog")]//button[contains(@class,"close")]',
-  '/html/body/div[19]/div/div[2]/div/div[2]/div/button/span/i/svg',
-  '/html/body/div[19]/div/div[2]/div/div[2]/div/div[4]/a[2]',
-  '/html/body/div[contains(@class,"el-dialog")]//a[contains(text(),"我知道了")]',
-  '/html/body//a[contains(text(),"我知道了")]',
-  '//div[contains(text(),"多设备登录提醒")]/following::a[contains(text(),"我知道了")]'
-];
+      '//a[contains(text(),"我知道了")]',
+      '//a[contains(text(),"知道")]',
+      '//button/span/i/svg[contains(@class,"el-icon-close")]',
+      '//div[contains(@class,"el-dialog")]//button[contains(@class,"close")]',
+      '/html/body/div[contains(@class,"el-dialog")]//a[contains(text(),"我知道了")]',
+      '//div[contains(text(),"多设备登录提醒")]/following::a[contains(text(),"我知道了")]'
+    ];
 
     let dialogClosed = false;
     for (const xpath of possibleDialogXPath) {
@@ -87,129 +116,91 @@ const webhookUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=bc1fd31
       console.log('✅ 未检测到需关闭的弹窗');
     }
 
-    await page.waitForTimeout(3000);
-    const finalUrl = page.url();
-    console.log('最终页面地址：', finalUrl);
-
-    if (!finalUrl.includes('/center')) {
-      throw new Error('未成功跳转后台页面，当前地址：' + finalUrl);
-    }
+    console.log('最终页面地址：', page.url());
 
     console.log('[6/7] 点击“交接班登记”卡片标题...');
+    const titleXPath = '//*[@id="recentUpdateBlock"]/div/div[2]/div[1]/div[2]/div[1]/div[2]/div[2]/div[1]/div[1]/div/p';
+    const dynamicDataXPath = '//span[contains(text(),"动态数据")]';
+
     try {
-      const titleXPath = '//*[@id="recentUpdateBlock"]/div/div[2]/div[1]/div[2]/div[1]/div[2]/div[2]/div[1]/div[1]/div/p';
       const titleElement = await page.waitForSelector(`xpath=${titleXPath}`, { timeout: 5000 });
       await titleElement.click();
       console.log('✅ 已点击“交接班登记”标题，准备进入详情页');
 
-      const dynamicDataXPath = '//span[contains(text(),"动态数据")]';
       const dynamicElement = await page.waitForSelector(`xpath=${dynamicDataXPath}`, { timeout: 5000 });
       await dynamicElement.click();
       console.log('✅ 已点击“动态数据”');
     } catch (e) {
-      console.error('❌ 点击“交接班登记”标题或“动态数据”失败');
-      const screenshotPath = path.join(screenshotDir, `${yyyy}-${mm}-${dd}-click-record-fail.png`);
-      try {
-        await page.screenshot({ path: screenshotPath });
-        await axios.post(webhookUrl, {
-          msgtype: "markdown",
-          markdown: {
-            content: `**草料二维码操作失败**\n点击交接班登记失败，错误信息：${e.message}`
-          }
-        });
-      } catch (sErr) {
-        console.warn('⚠️ 页面截图失败或推送失败');
-      }
+      const failShot = path.join(screenshotDir, `${dateDir}-click-fail.png`);
+      await page.screenshot({ path: failShot });
+      await axios.post(webhookUrl, {
+        msgtype: "markdown",
+        markdown: { content: `**草料二维码操作失败**\n点击交接班登记失败：${e.message}` }
+      });
       return;
     }
 
-    if (dd === '01') {
-      const lastMonth = new Date(yyyy, parseInt(mm) - 2, 1);
-      const lastMM = String(lastMonth.getMonth() + 1).padStart(2, '0');
-      const lastYYYY = lastMonth.getFullYear();
-      const targetDir = path.join(baseDir, 'pdf', `${lastYYYY}-${lastMM}`);
-
-      if (fs.existsSync(targetDir)) {
-        const zipPath = path.join(targetDir, `${lastYYYY}-${lastMM}.zip`);
-        const output = fs.createWriteStream(zipPath);
-        const archive = archiver('zip', { zlib: { level: 9 } });
-
-        output.on('close', async () => {
-          const summary = `📦 草料二维码：${lastYYYY}年${lastMM}月PDF打包完成，共${archive.pointer()}字节。`;
-          console.log(summary);
-          await axios.post(webhookUrl, {
-            msgtype: "markdown",
-            markdown: { content: `**${summary}**` }
-          });
-        });
-
-        archive.on('error', err => { throw err; });
-        archive.pipe(output);
-        archive.directory(targetDir, false);
-        await archive.finalize();
-      }
-    }
-
-    // 留言与PDF提取逻辑
-await page.waitForTimeout(3000);
-await page.mouse.wheel(0, 2000);
-
-const recordBlocks = await page.$$('div.card-record');
-let processed = { morning: false, evening: false };
-
-for (const block of recordBlocks) {
-  const timeText = await block.textContent();
-  if (!timeText) continue;
-
-  const matched = timeText.match(/(\d{2}):(\d{2})/);
-  if (!matched) continue;
-
-  const hour = parseInt(matched[1], 10);
-  const isMorning = hour >= 5 && hour < 12;
-  const isEvening = hour >= 17 && hour <= 23;
-
-  const label = isMorning ? '早班' : isEvening ? '晚班' : '';
-  if (!label || processed[label === '早班' ? 'morning' : 'evening']) continue;
-
-  const commentElement = await block.$('text=交接班留言');
-  const comment = commentElement ? await commentElement.textContent() : '未填写';
-  const filename = `${yyyy}-${mm}-${dd}-${label}.pdf`;
-  const filepath = path.join(pdfDir, filename);
-
-  if (fs.existsSync(filepath)) {
-    console.log(`📄 已存在 ${filename}，跳过下载`);
-  } else {
-    const downloadBtn = await block.$('text=PDF下载');
-    if (downloadBtn) {
-      await downloadBtn.click();
-      console.log(`⬇️ 已点击下载 ${filename}`);
-    } else {
-      console.log(`⚠️ 未找到下载按钮 ${filename}`);
-    }
     await page.waitForTimeout(3000);
-  }
+    await page.mouse.wheel(0, 2000);
 
-  fs.appendFileSync(recordLogPath, `[${yyyy}-${mm}-${dd} ${label}] 交接班留言：${comment}\n`);
-  if (label === '早班') processed.morning = true;
-  if (label === '晚班') processed.evening = true;
-}
+    const recordBlocks = await page.$$('div.card-record');
+    let processed = { morning: false, evening: false };
 
-const logText = fs.readFileSync(recordLogPath, 'utf8');
-await axios.post(webhookUrl, {
-  msgtype: 'markdown',
-  markdown: {
-    content: `**📋 今日交接班留言摘要（${yyyy}-${mm}-${dd}）**\n` + logText.replace(/\n/g, '\n')
-  }
-});
+    for (const block of recordBlocks) {
+      const timeText = await block.textContent();
+      if (!timeText) continue;
+      const matched = timeText.match(/(\d{2}):(\d{2})/);
+      if (!matched) continue;
 
+      const hour = parseInt(matched[1], 10);
+      const isMorning = hour >= 5 && hour < 12;
+      const isEvening = hour >= 17 && hour <= 23;
+      const label = isMorning ? '早班' : isEvening ? '晚班' : '';
+      if (!label || processed[label === '早班' ? 'morning' : 'evening']) continue;
+
+      const commentElement = await block.$('text=交接班留言');
+      const comment = commentElement ? await commentElement.textContent() : '未填写';
+      const filename = `${yyyy}-${mm}-${dd}-${label}.pdf`;
+      const filepath = path.join(pdfDir, filename);
+
+      if (fs.existsSync(filepath)) {
+        console.log(`📄 已存在 ${filename}，跳过下载`);
+      } else {
+        const downloadBtn = await block.$('text=PDF下载');
+        if (downloadBtn) {
+          try {
+            const [ download ] = await Promise.all([
+              page.waitForEvent('download', { timeout: 10000 }),
+              downloadBtn.click()
+            ]);
+            await download.saveAs(filepath);
+            console.log(`✅ PDF 下载完成：${filename}`);
+          } catch (e) {
+            console.error(`❌ PDF 下载失败：${filename}，错误：${e.message}`);
+          }
+        } else {
+          console.log(`⚠️ 未找到下载按钮 ${filename}`);
+        }
+      }
+
+      fs.appendFileSync(recordLogPath, `[${yyyy}-${mm}-${dd} ${label}] 交接班留言：${comment}\n`);
+      if (label === '早班') processed.morning = true;
+      if (label === '晚班') processed.evening = true;
+    }
+
+    const logText = fs.readFileSync(recordLogPath, 'utf8');
+    await axios.post(webhookUrl, {
+      msgtype: 'markdown',
+      markdown: {
+        content: `**📋 今日交接班留言摘要（${yyyy}-${mm}-${dd}）**\n` + logText.replace(/\n/g, '\n')
+      }
+    }).catch(err => {
+      console.error('❌ 微信机器人消息发送失败:', err.message);
+    });
 
   } catch (err) {
     const errorShot = path.join(screenshotDir, `${yyyy}-${mm}-${dd}-login-error.png`);
-    try {
-      await page.screenshot({ path: errorShot });
-    } catch (e) {
-      console.warn('⚠️ 页面截图失败，可能页面已关闭或加载异常');
-    }
+    try { await page.screenshot({ path: errorShot }); } catch {}
     await axios.post(webhookUrl, {
       msgtype: "markdown",
       markdown: {
