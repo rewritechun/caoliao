@@ -1,9 +1,40 @@
+// ==== 引入模块 ====
 const path = require('path');
+const fs = require('fs');
+const axios = require('axios');
+const { chromium } = require('playwright');
 
+// ==== 时间处理 ====
+const today = new Date();
+const yyyy = today.getFullYear();
+const mm = String(today.getMonth() + 1).padStart(2, '0');
+const dd = String(today.getDate()).padStart(2, '0');
+const dateDir = `${yyyy}-${mm}-${dd}`;
+
+// ==== 路径定义 ====
+const screenshotDir = `/root/caoliao/screenshots`;
+const pdfDir = `/root/caoliao/pdf/${dateDir}`;
+const recordLogPath = `/root/caoliao/logs/${dateDir}/extract.log`;
+const webhookUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=bc1fd31b-18ef-454b-a946-65f48392bd98';
+
+// ==== XPath 选择器定义 ====
+const titleXPath = '//*[@id="recentUpdateBlock"]//div[contains(text(), "交接班登记")]';
+const dynamicDataXPath = '//*[contains(text(), "动态数据")]';
+
+// ==== 启动浏览器任务 ====
 (async () => {
-  // === 前面保持不变 ===
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage();
 
   try {
+    // 登录部分请按你原有逻辑补充，假设此时 page 已登录
+
+    // 确保目录存在
+    fs.mkdirSync(screenshotDir, { recursive: true });
+    fs.mkdirSync(pdfDir, { recursive: true });
+    fs.mkdirSync(path.dirname(recordLogPath), { recursive: true });
+
+    // 点击交接班登记标题
     const titleElement = await page.waitForSelector(`xpath=${titleXPath}`, { timeout: 5000 });
     await titleElement.click();
     console.log('✅ 已点击“交接班登记”标题，准备进入详情页');
@@ -81,8 +112,9 @@ const path = require('path');
     await page.screenshot({ path: failShot });
     await axios.post(webhookUrl, {
       msgtype: "markdown",
-      markdown: { content: `**草料二维码操作失败**\n点击交接班登记失败：${e.message}` }
+      markdown: { content: `**草料二维码操作失败**\n错误信息：${e.message}` }
     });
-    return;
+  } finally {
+    await browser.close();
   }
 })();
